@@ -220,6 +220,7 @@ jpeg_init_read_tile_scanline(j_decompress_ptr cinfo, huffman_index *index,
             / index->MCU_sample_size) * index->MCU_sample_size;
   int col_right_boundary =
                   jdiv_round_up(*start_x + *width, lines_per_iMCU_col);
+  int sample_size;
 
   cinfo->coef->MCU_columns_to_skip =
       *start_x / lines_per_iMCU_col - col_left_boundary;
@@ -243,7 +244,7 @@ jpeg_init_read_tile_scanline(j_decompress_ptr cinfo, huffman_index *index,
   else
     jpeg_decompress_per_scan_setup(cinfo);
 
-  int sample_size = DCTSIZE / cinfo->min_DCT_scaled_size;
+  sample_size = DCTSIZE / cinfo->min_DCT_scaled_size;
 
   *height = jdiv_round_up(*height, sample_size);
   *width = cinfo->output_width;

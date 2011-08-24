@@ -254,6 +254,7 @@ dummy_consume_data (j_decompress_ptr cinfo)
 METHODDEF(int)
 consume_data (j_decompress_ptr cinfo)
 {
+  unsigned int MCUs_per_row;
   my_coef_ptr coef = (my_coef_ptr) cinfo->coef;
   JDIMENSION MCU_col_num;	/* index of current MCU within row */
   int blkn, ci, xindex, yindex, yoffset;
@@ -274,7 +275,7 @@ consume_data (j_decompress_ptr cinfo)
      * because we requested a pre-zeroed array.
      */
   }
-  unsigned int MCUs_per_row = cinfo->MCUs_per_row;
+  MCUs_per_row = cinfo->MCUs_per_row;
 #ifdef ANDROID_TILE_BASED_DECODE
   if (cinfo->tile_decode) {
     int iMCU_width_To_MCU_width;
@@ -391,6 +392,9 @@ METHODDEF(int)
 consume_data_build_huffman_index_baseline (j_decompress_ptr cinfo,
         huffman_index *index, int current_scan)
 {
+  size_t allocate_size;
+  huffman_offset_data *offset_data;
+
   my_coef_ptr coef = (my_coef_ptr) cinfo->coef;
   JDIMENSION MCU_col_num;	/* index of current MCU within row */
   int ci, xindex, yindex, yoffset;
@@ -400,14 +404,14 @@ consume_data_build_huffman_index_baseline (j_decompress_ptr cinfo,
   huffman_scan_header *scan_header = index->scan + current_scan;
   scan_header->MCU_rows_per_iMCU_row = coef->MCU_rows_per_iMCU_row;
 
-  size_t allocate_size = coef->MCU_rows_per_iMCU_row
+  allocate_size = coef->MCU_rows_per_iMCU_row
       * jdiv_round_up(cinfo->MCUs_per_row, index->MCU_sample_size)
       * sizeof(huffman_offset_data);
   scan_header->offset[cinfo->input_iMCU_row] =
         (huffman_offset_data*)malloc(allocate_size);
   index->mem_used += allocate_size;
 
-  huffman_offset_data *offset_data = scan_header->offset[cinfo->input_iMCU_row];
+  offset_data = scan_header->offset[cinfo->input_iMCU_row];
 
   /* Loop to process one whole iMCU row */
   for (yoffset = coef->MCU_vert_offset; yoffset < coef->MCU_rows_per_iMCU_row;
@@ -458,24 +462,28 @@ consume_data_build_huffman_index_progressive (j_decompress_ptr cinfo,
   JBLOCKARRAY buffer[MAX_COMPS_IN_SCAN];
   JBLOCKROW buffer_ptr;
   jpeg_component_info *compptr;
+  int sample_size;
+  huffman_scan_header *scan_header;
+  size_t allocate_size;
+  huffman_offset_data *offset_data;
 
   int factor = 4; // maximum factor is 4.
   for (ci = 0; ci < cinfo->comps_in_scan; ci++)
     factor = jmin(factor, cinfo->cur_comp_info[ci]->h_samp_factor);
 
-  int sample_size = index->MCU_sample_size * factor;
-  huffman_scan_header *scan_header = index->scan + current_scan;
+  sample_size = index->MCU_sample_size * factor;
+  scan_header = index->scan + current_scan;
   scan_header->MCU_rows_per_iMCU_row = coef->MCU_rows_per_iMCU_row;
   scan_header->MCUs_per_row = jdiv_round_up(cinfo->MCUs_per_row, sample_size);
   scan_header->comps_in_scan = cinfo->comps_in_scan;
 
-  size_t allocate_size = coef->MCU_rows_per_iMCU_row
+  allocate_size = coef->MCU_rows_per_iMCU_row
       * scan_header->MCUs_per_row * sizeof(huffman_offset_data);
   scan_header->offset[cinfo->input_iMCU_row] =
         (huffman_offset_data*)malloc(allocate_size);
   index->mem_used += allocate_size;
 
-  huffman_offset_data *offset_data = scan_header->offset[cinfo->input_iMCU_row];
+  offset_data = scan_header->offset[cinfo->input_iMCU_row];
 
   /* Align the virtual buffers for the components used in this scan. */
   for (ci = 0; ci < cinfo->comps_in_scan; ci++) {
@@ -563,6 +571,8 @@ decompress_data (j_decompress_ptr cinfo, JSAMPIMAGE output_buf)
   JDIMENSION output_col;
   jpeg_component_info *compptr;
   inverse_DCT_method_ptr inverse_DCT;
+  int width_in_blocks;
+  int start_block = 0;
 
   /* Force some input to be done if we are getting ahead of the input. */
   while (cinfo->input_scan_number < cinfo->output_scan_number ||
@@ -593,8 +603,8 @@ decompress_data (j_decompress_ptr cinfo, JSAMPIMAGE output_buf)
     }
     inverse_DCT = cinfo->idct->inverse_DCT[ci];
     output_ptr = output_buf[ci];
-    int width_in_blocks = compptr->width_in_blocks;
-    int start_block = 0;
+    width_in_blocks = compptr->width_in_blocks;
+    start_block = 0;
 #if ANDROID_TILE_BASED_DECODE
     if (cinfo->tile_decode) {
       // width_in_blocks for a component depends on its h_samp_factor.

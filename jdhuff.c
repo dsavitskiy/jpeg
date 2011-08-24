@@ -566,6 +566,11 @@ GLOBAL(void)
 jpeg_configure_huffman_decoder(j_decompress_ptr cinfo,
         huffman_offset_data offset)
 {
+  unsigned int bitstream_offset;
+  int blkn, i;
+  unsigned int byte_offset;
+  unsigned int bit_in_bit_buffer;
+
   huff_entropy_ptr entropy = (huff_entropy_ptr) cinfo->entropy;
 
   // Restore restarts_to_go and next_restart_num
@@ -573,11 +578,10 @@ jpeg_configure_huffman_decoder(j_decompress_ptr cinfo,
   entropy->restarts_to_go = offset.restarts_to_go;
   cinfo->marker->next_restart_num = offset.next_restart_num;
 
-  unsigned int bitstream_offset = offset.bitstream_offset;
-  int blkn, i;
+  bitstream_offset = offset.bitstream_offset;
 
-  unsigned int byte_offset = bitstream_offset >> LOG_TWO_BIT_BUF_SIZE;
-  unsigned int bit_in_bit_buffer =
+  byte_offset = bitstream_offset >> LOG_TWO_BIT_BUF_SIZE;
+  bit_in_bit_buffer =
       bitstream_offset & ((1 << LOG_TWO_BIT_BUF_SIZE) - 1);
 
   jset_input_stream_position_bit(cinfo, byte_offset,
